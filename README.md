@@ -1,6 +1,6 @@
 # Amatu Sketch
 
-SketchUp-style 3D modeling in the browser — live at **https://liemyo.github.io/sketchup/**
+SketchUp-style 3D modeling in the browser — live at **https://amatu-id.github.io/sketchup/**
 
 - Edge/face engine: closed coplanar edges become faces, lines split faces, Push/Pull with stretch/heal and cut-through, Follow Me, Offset, Intersect Faces, Solid Tools (union/subtract/intersect/trim/split/outer shell).
 - Inference engine: endpoint, midpoint, on edge, on face, center, red/green/blue axis locks (arrow keys), parallel/perpendicular, from-point tracking, Shift lock, Measurements box (type values, `x5` / `/5` arrays).
