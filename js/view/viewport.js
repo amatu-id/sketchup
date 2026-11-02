@@ -92,12 +92,15 @@ export class Viewport {
 
   resize() {
     const w = this.el.clientWidth || 1, h = this.el.clientHeight || 1;
+    if (w === this.w && h === this.h) return;
     this.w = w; this.h = h;
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = w + 'px'; this.renderer.domElement.style.height = h + 'px';
     for (const m of this.lineMats) m.resolution.set(w, h);
     this.overlay.resize(w, h);
     this.applyCamera(); this.requestRender();
+    // setSize cleared the drawing buffer: render before this frame is shown, not one frame later (blank flash)
+    if (this.app.model) { try { this.dirty = false; this.render(); } catch { this.dirty = true; } }
   }
 
   // ------------------------------------------------------------ camera
