@@ -6,6 +6,7 @@ import { isMac } from '../tools/base.js';
 import { Entities, nid } from '../core/model.js';
 import { build3DText } from '../tools/construct.js';
 import { entsBox } from '../core/ops.js';
+import { NAV_DEFAULTS } from '../view/viewport.js';
 
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -99,10 +100,13 @@ export class Dialogs {
       for (const b of nav.children) b.classList.toggle('on', b.dataset.t === t);
       pane.innerHTML = '';
       if (t === 'general') {
-        const opts = [['trackpad', 'Use trackpad navigation (two-finger swipe = orbit, Shift = pan, pinch = zoom)'], ['invertZoom', 'Invert scroll wheel zoom'], ['tooltips', 'Show inference tooltips'], ['autosave', 'Auto-save to this browser'], ['spaceSelect', 'Space bar activates Select']];
+        const opts = [['tooltips', 'Show inference tooltips'], ['autosave', 'Auto-save to this browser'], ['spaceSelect', 'Space bar activates Select']];
         for (const [k, l] of opts) { const [row, i] = cb(k === 'spaceSelect' ? s[k] !== false : s[k], l); i.addEventListener('change', () => { s[k] = i.checked; app.saveSettings(); }); pane.append(row); }
-        const zs = h('input', { type: 'range', min: 0.3, max: 3, step: 0.1, value: s.zoomSpeed || 1 }); zs.addEventListener('input', () => { s.zoomSpeed = +zs.value; app.saveSettings(); });
-        pane.append(field('Zoom speed', zs));
+        pane.append(h('p', { class: 'muted' }, 'Mouse, trackpad and touch sensitivity are under ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); show('nav'); } }, 'Navigation'), '.'));
+      } else if (t === 'nav') {
+        this.navPrefs(pane, () => show('nav'));
+      } else if (t === 'ai') {
+        this.aiPrefs(pane);
       } else {
         const filter = inp('', 'search', { placeholder: 'Filter commands…' });
         const list = h('div', { class: 'keylist' });
@@ -137,9 +141,53 @@ export class Dialogs {
         render();
       }
     };
-    for (const [t, l] of [['general', 'General'], ['shortcuts', 'Shortcuts']]) nav.append(h('button', { class: 'vtab', 'data-t': t, onclick: () => show(t) }, l));
+    for (const [t, l] of [['general', 'General'], ['nav', 'Navigation'], ['ai', 'Image to 3D (AI)'], ['shortcuts', 'Shortcuts']]) nav.append(h('button', { class: 'vtab', 'data-t': t, onclick: () => show(t) }, l));
     this.ui.modal('Preferences', h('div', { class: 'vsplit' }, nav, pane), [{ label: 'Close', primary: true }], { wide: true });
     show(tab);
+  }
+
+  // Preferences › Navigation: mouse, trackpad and touch-screen sensitivity (applied live by the viewport)
+  navPrefs(pane, refresh) {
+    const app = this.app, s = app.settings, N = app.view.navCfg();
+    const set = (k, v) => { s[k] = v; if (k === 'wheelMode') s.trackpad = v !== 'mouse'; app.saveSettings(); };
+    const pct = (v) => Math.round(v * 100) + '%';
+    const slider = (k, label, min = 0.2, max = 3) => {
+      const out = h('output', {}, pct(N[k]));
+      const r = h('input', { type: 'range', min, max, step: 0.05, value: N[k], 'aria-label': label });
+      r.addEventListener('input', () => { set(k, +r.value); out.textContent = pct(+r.value); });
+      r.addEventListener('dblclick', () => { r.value = NAV_DEFAULTS[k]; set(k, NAV_DEFAULTS[k]); out.textContent = pct(NAV_DEFAULTS[k]); });
+      return h('label', { class: 'fld sl', title: 'Double-click the slider to reset to 100%' }, h('span', {}, label), r, out);
+    };
+    const choice = (k, label, opts) => { const x = sel(opts, N[k]); x.addEventListener('change', () => set(k, x.value)); return field(label, x); };
+    const check = (k, label) => { const [row, i] = cb(N[k], label); i.addEventListener('change', () => set(k, i.checked)); return row; };
+    pane.append(
+      h('h4', {}, 'Mouse'),
+      slider('orbitSpeed', 'Orbit sensitivity'), slider('panSpeed', 'Pan sensitivity'), slider('zoomSpeed', 'Scroll-wheel zoom speed'),
+      choice('middleButton', 'Middle-button drag', [['orbit', 'Orbit  ·  Shift = Pan'], ['pan', 'Pan  ·  Shift = Orbit']]),
+      choice('orbitPivot', 'Orbit around', [['auto', 'Point under the cursor'], ['cursor', 'Point under the cursor (trackpad too)'], ['center', 'Center of the view']]),
+      h('div', { class: 'row' }, check('zoomToCursor', 'Zoom toward the cursor'), check('invertZoom', 'Invert wheel zoom'), check('invertOrbitX', 'Invert orbit left/right'), check('invertOrbitY', 'Invert orbit up/down')),
+      h('h4', {}, 'Trackpad'),
+      choice('wheelMode', 'Scrolling device', [['auto', 'Detect automatically'], ['trackpad', 'Trackpad — swipe moves the view'], ['mouse', 'Mouse wheel — scroll zooms']]),
+      choice('tpSwipe', 'Two-finger swipe', [['orbit', 'Orbit  ·  Shift = Pan'], ['pan', 'Pan  ·  Shift = Orbit']]),
+      slider('tpOrbitSpeed', 'Swipe orbit sensitivity'), slider('tpPanSpeed', 'Swipe pan sensitivity'), slider('pinchSpeed', 'Pinch zoom sensitivity'),
+      h('div', { class: 'row' }, check('tpInvert', 'Reverse swipe direction')),
+      h('h4', {}, 'Touch screen (phone & tablet)'),
+      choice('touchTwoFinger', 'Two-finger drag', [['orbit', 'Orbit  ·  three fingers = Pan'], ['pan', 'Pan  ·  three fingers = Orbit']]),
+      slider('touchOrbitSpeed', 'Orbit sensitivity'), slider('touchPanSpeed', 'Pan sensitivity'), slider('touchPinchSpeed', 'Pinch zoom sensitivity'),
+      h('div', { class: 'row' }, check('touchTwist', 'Twist two fingers to spin the view')),
+      h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: () => { for (const k of Object.keys(NAV_DEFAULTS)) delete s[k]; s.trackpad = isMac; app.saveSettings(); refresh(); app.toast('Navigation reset to defaults'); } }, 'Reset to defaults'),
+        h('span', { class: 'muted' }, 'Changes apply right away. If a mouse wheel orbits instead of zooming, set Scrolling device to Mouse wheel.')),
+    );
+  }
+  aiPrefs(pane) {
+    const app = this.app, s = app.settings;
+    const tok = inp(s.hfToken || '', 'password', { placeholder: 'hf_…', autocomplete: 'off', spellcheck: 'false' });
+    tok.addEventListener('change', () => { s.hfToken = tok.value.trim(); app.saveSettings(); app.toast(s.hfToken ? 'Hugging Face token saved' : 'Token removed'); });
+    pane.append(
+      h('p', {}, 'Image to 3D sends your picture to free AI models on Hugging Face (Hunyuan3D, TRELLIS, Stable Fast 3D, TripoSG). Each visitor gets a small free GPU quota per day.'),
+      field('Hugging Face token', tok),
+      h('p', { class: 'muted' }, 'Optional. With a free account the daily quota is larger; with PRO it is much larger. Create a token with “Read” access at huggingface.co › Settings › Access Tokens and paste it here. It is kept in this app’s settings and sent only to Hugging Face.'),
+    );
   }
 
   dialogMakeComponent() {
@@ -211,10 +259,11 @@ export class Dialogs {
   dialogAbout() {
     this.ui.modal('About Amatu Sketch', h('div', {}, h('p', {}, h('b', {}, 'Amatu Sketch'), ' — a SketchUp-style 3D modeler for the browser.'),
       h('p', { class: 'muted' }, 'Independent project; not affiliated with or endorsed by Trimble Inc. “SketchUp” is a trademark of Trimble Inc.'),
-      h('p', {}, 'Native files are saved as .amsk (JSON). Export to COLLADA (.dae, opens in SketchUp via File › Import), OBJ, STL, glTF, AutoCAD DXF (2D & 3D), PNG/JPG/SVG and multi-sheet PDF working drawings.')), [{ label: 'Close', primary: true }]);
+      h('p', {}, 'Native files are saved as .amsk (JSON). Export to COLLADA (.dae, opens in SketchUp via File › Import), OBJ, STL, glTF, AutoCAD DXF (2D & 3D), PNG/JPG/SVG and multi-sheet PDF working drawings.'),
+      h('p', { class: 'muted' }, 'Image to 3D uses free models hosted on Hugging Face Spaces (Hunyuan3D 2.1 by Tencent, TRELLIS by Microsoft, Stable Fast 3D by Stability AI, TripoSG by VAST). Your picture goes straight from this browser to the Space you pick, under that model’s own license and terms.')), [{ label: 'Close', primary: true }]);
   }
   dialogGestures() {
     const rows = [['Orbit', 'Middle-drag · O tool · trackpad two-finger swipe · touch two-finger drag'], ['Pan', 'Shift + middle-drag · H tool · Shift + two-finger swipe · touch three-finger drag'], ['Zoom', 'Scroll wheel (zooms to cursor) · pinch · Z tool'], ['Center view', 'Double-click with the middle button / in the Orbit tool'], ['Zoom Extents', 'Shift+Z'], ['Context menu', 'Right-click · two-finger tap'], ['Lock inference', 'Hold Shift'], ['Lock axis', '→ red · ← green · ↑ blue · ↓ parallel/perpendicular'], ['Copy (Move/Rotate)', isMac ? 'Tap ⌥ Option' : 'Tap Ctrl'], ['Arrays', 'After copying type x5 or /5 and Enter'], ['Measurements', 'Just type numbers while using a tool, then Enter']];
-    this.ui.modal('Mouse, Trackpad & Gestures', h('table', { class: 'stats' }, ...rows.map(([a, b]) => h('tr', {}, h('td', {}, h('b', {}, a)), h('td', {}, b)))), [{ label: 'Close', primary: true }], { wide: true });
+    this.ui.modal('Mouse, Trackpad & Gestures', h('table', { class: 'stats' }, ...rows.map(([a, b]) => h('tr', {}, h('td', {}, h('b', {}, a)), h('td', {}, b)))), [{ label: 'Sensitivity settings…', run: () => { this.dialogPrefs('nav'); return false; } }, { label: 'Close', primary: true }], { wide: true });
   }
 }

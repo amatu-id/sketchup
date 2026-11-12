@@ -75,6 +75,7 @@ export const ICONS = {
   save: svg(`<path d="M4 3h13l3 3v15H4z" fill="${B}"/><path d="M7 3h9v6H7z" fill="${W}"/><rect x="7" y="13" width="10" height="8" fill="${W}"/>`),
   print: svg(`<path d="M6 3h12v5H6z" fill="${W}"/><rect x="3" y="8" width="18" height="9" rx="1.5" fill="${L}"/><path d="M6 14h12v7H6z" fill="${W}"/>`),
   export: svg(`<path d="M5 3h9l5 5v13H5z" fill="${W}"/><path d="M12 10v8M9 15l3 3 3-3" stroke="${G}" stroke-width="1.8"/>`),
+  image3d: svg(`<rect x="2.5" y="3" width="11" height="9.5" rx="1.2" fill="${W}"/><path d="M3.6 11.3l3.1-3.4 2.3 2.3 1.6-1.5 2.4 2.6" stroke="${G}"/><circle cx="10" cy="6" r="1.1" fill="${Y}" stroke="none"/><path d="M11.5 14.5l5.2-2.6 5.2 2.6v5.6l-5.2 2.6-5.2-2.6z" fill="#dbe7fb"/><path d="M11.5 14.5l5.2 2.6 5.2-2.6M16.7 17.1v5.6"/><path d="M15.5 3.2l.55 1.45 1.45.55-1.45.55-.55 1.45-.55-1.45-1.45-.55 1.45-.55z" fill="${P}" stroke="${P}" stroke-width=".8"/><path d="M19.6 6.6l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4z" fill="${P}" stroke="${P}" stroke-width=".6"/>`),
   import: svg(`<path d="M5 3h9l5 5v13H5z" fill="${W}"/><path d="M12 18v-8M9 13l3-3 3 3" stroke="${B}" stroke-width="1.8"/>`),
   drawings: svg(`<rect x="2.5" y="4" width="19" height="16" fill="${W}"/><path d="M2.5 16h19M15 16v4M5 7h7v6H5z"/><path d="M14 7h5v6h-5" stroke="${B}"/>`),
   info: svg(`<circle cx="12" cy="12" r="9" fill="#e8f1ff"/><path d="M12 11v6M12 7.5v.5" stroke-width="2"/>`),

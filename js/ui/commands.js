@@ -40,6 +40,7 @@ export function buildCommands(app) {
   add('save', 'Save', () => app.io.save(), { icon: 'save' });
   add('saveas', 'Save As…', () => app.io.save(true));
   add('import', 'Import…', () => app.io.importFile(), { icon: 'import' });
+  add('image3d', 'Image to 3D Model (AI)…', () => app.ui.image3d(), { icon: 'image3d' });
   add('export:dae', 'SketchUp-compatible COLLADA (*.dae)…', () => app.io.export3D('dae'));
   add('export:skp', 'SketchUp Model (*.dae for SketchUp)…', () => app.io.export3D('dae'));
   add('export:obj', 'OBJ File (*.obj)…', () => app.io.export3D('obj'));
@@ -129,6 +130,7 @@ export function buildCommands(app) {
   add('help:about', 'About Amatu Sketch', () => app.ui.dialogAbout());
   add('help:welcome', 'Welcome Screen', () => app.ui.welcome(false));
   add('help:gestures', 'Mouse, Trackpad & Gestures', () => app.ui.dialogGestures());
+  add('help:nav', 'Navigation Sensitivity…', () => app.ui.dialogPrefs('nav'));
   void THREE;
   return C;
 }
@@ -137,7 +139,7 @@ export function menus(app) {
   const sep = '-';
   const panelLabel = { entity: 'Entity Info', materials: 'Materials', components: 'Components', styles: 'Styles', tags: 'Tags', scenes: 'Scenes', shadows: 'Shadows', fog: 'Fog', outliner: 'Outliner', soften: 'Soften Edges', instructor: 'Instructor' };
   return [
-    { label: 'File', items: ['new', 'open', sep, 'save', 'saveas', sep, 'import', { label: 'Export', items: [{ label: '3D Model', items: ['export:skp', 'export:dae', 'export:obj', 'export:stl', 'export:glb', 'export:dxf3d'] }, { label: '2D Graphic', items: ['export:png', 'export:jpg', 'export:svg', 'export:pdfview', 'export:dxfview'] }, sep, 'drawings'] }, 'drawings', sep, 'print'] },
+    { label: 'File', items: ['new', 'open', sep, 'save', 'saveas', sep, 'import', 'image3d', { label: 'Export', items: [{ label: '3D Model', items: ['export:skp', 'export:dae', 'export:obj', 'export:stl', 'export:glb', 'export:dxf3d'] }, { label: '2D Graphic', items: ['export:png', 'export:jpg', 'export:svg', 'export:pdfview', 'export:dxfview'] }, sep, 'drawings'] }, 'drawings', sep, 'print'] },
     { label: 'Edit', items: ['undo', 'redo', sep, 'cut', 'copy', 'paste', 'pasteinplace', 'delete', 'deleteguides', sep, 'selectall', 'selectnone', 'invertsel', sep, 'hide', { label: 'Unhide', items: ['unhide:sel', 'unhide:last', 'unhide:all'] }, 'lock', 'unlock', sep, 'makecomponent', 'makegroup', 'closegroup', { label: 'Intersect Faces', items: ['intersect:model', 'intersect:selection', 'intersect:context'] }, sep, { label: 'Group / Component', items: ['editgroup', 'explode'] }, { label: 'Flip Along', items: ['flip:x', 'flip:y', 'flip:z'] }] },
     { label: 'View', items: [{ label: 'Toolbars', items: [{ label: 'Large Tool Set', run: () => app.ui.toggleToolbar('left'), checked: () => app.ui.toolbarVisible('left') }, { label: 'Getting Started / Principal', run: () => app.ui.toggleToolbar('main'), checked: () => app.ui.toolbarVisible('main') }, { label: 'Views', run: () => app.ui.toggleToolbar('views'), checked: () => app.ui.toolbarVisible('views') }, { label: 'Styles', run: () => app.ui.toggleToolbar('styles'), checked: () => app.ui.toolbarVisible('styles') }, { label: 'Section', run: () => app.ui.toggleToolbar('section'), checked: () => app.ui.toolbarVisible('section') }, { label: 'Solid Tools', run: () => app.ui.toggleToolbar('solid'), checked: () => app.ui.toolbarVisible('solid') }, { label: 'Camera', run: () => app.ui.toggleToolbar('camera'), checked: () => app.ui.toolbarVisible('camera') }] }, 'view:scenetabs', 'view:hidden', 'view:sectionplanes', 'view:sectioncuts', 'view:sectionfill', 'view:axes', 'view:guides', 'view:shadows', 'view:fog', sep,
       { label: 'Edge Style', items: ['style:edges', 'style:backedges', 'style:profiles'] }, { label: 'Face Style', items: ['style:xray', sep, 'style:wire', 'style:hidden', 'style:shaded', 'style:textured', 'style:mono'] }, { label: 'Component Edit', items: ['view:fade'] }, { label: 'Animation', items: ['scene:add', 'scene:update', 'scene:delete', sep, 'scene:play'] }] },
@@ -145,16 +147,16 @@ export function menus(app) {
     { label: 'Draw', items: [{ label: 'Lines', items: ['tool:line', 'tool:freehand'] }, { label: 'Arcs', items: ['tool:arc', 'tool:arc2', 'tool:arc3', 'tool:pie'] }, { label: 'Shapes', items: ['tool:rect', 'tool:rotrect', 'tool:circle', 'tool:polygon'] }] },
     { label: 'Tools', items: ['tool:select', 'tool:eraser', 'tool:paint', sep, 'tool:move', 'tool:rotate', 'tool:scale', 'tool:flip', sep, 'tool:pushpull', 'tool:followme', 'tool:offset', sep, 'tool:solid-shell', { label: 'Solid Tools', items: ['tool:solid-intersect', 'tool:solid-union', 'tool:solid-subtract', 'tool:solid-trim', 'tool:solid-split'] }, sep, 'tool:tape', 'tool:protractor', 'tool:axes', 'tool:dimension', 'tool:text', 'text3d', sep, 'tool:section'] },
     { label: 'Window', items: [{ label: 'Default Tray', items: Object.keys(panelLabel).map((p) => ({ cmd: 'panel:' + p, label: panelLabel[p] })) }, sep, 'modelinfo', 'prefs'] },
-    { label: 'Help', items: ['help:welcome', 'help:keys', 'help:gestures', sep, 'help:about'] },
+    { label: 'Help', items: ['help:welcome', 'help:keys', 'help:gestures', 'help:nav', sep, 'help:about'] },
   ];
 }
 
 export const TOOLBARS = {
-  main: ['tool:select', 'makecomponent', 'tool:eraser', 'tool:paint', '|', 'tool:line', 'tool:arc2', 'tool:rect', 'tool:circle', 'tool:pushpull', 'tool:offset', '|', 'tool:move', 'tool:rotate', 'tool:scale', 'tool:followme', '|', 'tool:tape', 'tool:dimension', 'tool:text', 'tool:section', '|', 'tool:orbit', 'tool:pan', 'tool:zoom', 'zoomext', 'prevview'],
+  main: ['tool:select', 'makecomponent', 'tool:eraser', 'tool:paint', '|', 'tool:line', 'tool:arc2', 'tool:rect', 'tool:circle', 'tool:pushpull', 'tool:offset', '|', 'tool:move', 'tool:rotate', 'tool:scale', 'tool:followme', '|', 'tool:tape', 'tool:dimension', 'tool:text', 'tool:section', '|', 'image3d', '|', 'tool:orbit', 'tool:pan', 'tool:zoom', 'zoomext', 'prevview'],
   views: ['view:iso', 'view:top', 'view:front', 'view:right', 'view:back', 'view:left'],
   styles: ['style:xray', 'style:backedges', 'style:wire', 'style:hidden', 'style:shaded', 'style:textured', 'style:mono'],
   section: ['tool:section', 'view:sectionplanes', 'view:sectioncuts', 'view:sectionfill'],
   solid: ['tool:solid-shell', 'tool:solid-intersect', 'tool:solid-union', 'tool:solid-subtract', 'tool:solid-trim', 'tool:solid-split'],
   camera: ['tool:poscam', 'tool:walk', 'tool:look', 'view:shadows', 'view:fog'],
-  left: ['tool:select', 'makecomponent', 'tool:paint', 'tool:eraser', 'tool:line', 'tool:freehand', 'tool:arc2', 'tool:arc', 'tool:rect', 'tool:circle', 'tool:polygon', 'tool:rotrect', 'tool:pushpull', 'tool:followme', 'tool:move', 'tool:rotate', 'tool:scale', 'tool:offset', 'tool:tape', 'tool:dimension', 'tool:protractor', 'tool:text', 'tool:axes', 'text3d', 'tool:orbit', 'tool:pan', 'tool:zoom', 'zoomext', 'tool:zoomwindow', 'prevview', 'tool:poscam', 'tool:look', 'tool:walk', 'tool:section'],
+  left: ['tool:select', 'makecomponent', 'tool:paint', 'tool:eraser', 'tool:line', 'tool:freehand', 'tool:arc2', 'tool:arc', 'tool:rect', 'tool:circle', 'tool:polygon', 'tool:rotrect', 'tool:pushpull', 'tool:followme', 'tool:move', 'tool:rotate', 'tool:scale', 'tool:offset', 'tool:tape', 'tool:dimension', 'tool:protractor', 'tool:text', 'tool:axes', 'text3d', 'image3d', 'tool:orbit', 'tool:pan', 'tool:zoom', 'zoomext', 'tool:zoomwindow', 'prevview', 'tool:poscam', 'tool:look', 'tool:walk', 'tool:section'],
 };

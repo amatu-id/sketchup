@@ -5,11 +5,12 @@ import { COL } from '../view/overlay.js';
 
 export class OrbitTool extends Tool {
   constructor(app) { super(app); this.id = 'orbit'; this.cursor = 'orbit'; this.hint = 'Drag to orbit. Shift = pan. Double-click to center the view on a point.'; }
-  onDown(ev) { this.d = { x: ev.x, y: ev.y, pivot: this.view.pivotAt(ev.x, ev.y) }; }
+  onDown(ev) { this.d = { x: ev.x, y: ev.y, pivot: this.view.navPivot(ev.x, ev.y) }; }
   onMove(ev) {
     if (!this.d || !(ev.buttons & 1)) return;
     const dx = ev.x - this.d.x, dy = ev.y - this.d.y; this.d.x = ev.x; this.d.y = ev.y;
-    if (ev.shift) this.view.pan(dx, dy, this.d.pivot); else this.view.orbit(dx, dy, this.d.pivot);
+    const src = ev.raw?.pointerType === 'touch' ? 'touch' : 'mouse';
+    if (ev.shift) this.view.navPan(dx, dy, this.d.pivot, src); else this.view.navOrbit(dx, dy, this.d.pivot, src);
   }
   onUp() { this.d = null; this.view.pushHistory(); }
   onDbl(ev) { const h = this.view.pickFace(ev.x, ev.y); if (h) { const c = this.view.cam, d = h.point.clone().sub(c.target); this.view.animateTo({ eye: c.eye.clone().add(d), target: h.point }, 250); } }
@@ -19,7 +20,7 @@ export class OrbitTool extends Tool {
 export class PanTool extends Tool {
   constructor(app) { super(app); this.id = 'pan'; this.cursor = 'pan'; this.hint = 'Drag to pan the view.'; }
   onDown(ev) { this.d = { x: ev.x, y: ev.y, pivot: this.view.pivotAt(ev.x, ev.y) }; }
-  onMove(ev) { if (!this.d || !(ev.buttons & 1)) return; this.view.pan(ev.x - this.d.x, ev.y - this.d.y, this.d.pivot); this.d.x = ev.x; this.d.y = ev.y; }
+  onMove(ev) { if (!this.d || !(ev.buttons & 1)) return; this.view.navPan(ev.x - this.d.x, ev.y - this.d.y, this.d.pivot, ev.raw?.pointerType === 'touch' ? 'touch' : 'mouse'); this.d.x = ev.x; this.d.y = ev.y; }
   onUp() { this.d = null; this.view.pushHistory(); }
 }
 export class ZoomTool extends Tool {
@@ -30,7 +31,7 @@ export class ZoomTool extends Tool {
     if (!this.d || !(ev.buttons & 1)) return;
     const dy = ev.y - this.d.y; this.d.y = ev.y;
     if (ev.shift) { this.view.fov(this.view.cam.fov + dy * 0.2); this.app.setVCB('Field of View', this.view.cam.fov.toFixed(1) + ' deg'); }
-    else this.view.zoomAt(Math.exp(dy * 0.008), this.d.ox, this.d.oy);
+    else this.view.zoomAt(Math.exp(dy * 0.008 * (this.view.navCfg().zoomSpeed || 1)), this.d.ox, this.d.oy);
   }
   onUp() { this.d = null; this.view.pushHistory(); }
   onVCB(s) {

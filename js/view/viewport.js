@@ -635,6 +635,33 @@ export class Viewport {
   }
 
   // ------------------------------------------------------------ input
+  // navigation preferences (Preferences › Navigation); older files only had trackpad/invertZoom/zoomSpeed
+  navCfg() {
+    const s = this.app.settings || {}, o = { ...NAV_DEFAULTS };
+    for (const k of Object.keys(NAV_DEFAULTS)) if (s[k] != null) o[k] = s[k];
+    if (s.wheelMode == null && s.trackpad === false) o.wheelMode = 'mouse';
+    return o;
+  }
+  // orbit / pan with the sensitivity of the input device that produced the movement
+  navOrbit(dx, dy, pivot, src = 'mouse') {
+    const N = this.navCfg(), k = src === 'touch' ? N.touchOrbitSpeed : src === 'trackpad' ? N.tpOrbitSpeed : N.orbitSpeed;
+    this.orbit(dx * k * (N.invertOrbitX ? -1 : 1), dy * k * (N.invertOrbitY ? -1 : 1), pivot);
+  }
+  navPan(dx, dy, pivot, src = 'mouse') {
+    const N = this.navCfg(), k = src === 'touch' ? N.touchPanSpeed : src === 'trackpad' ? N.tpPanSpeed : N.panSpeed;
+    this.pan(dx * k, dy * k, pivot);
+  }
+  navPivot(x, y, src = 'mouse') {
+    const m = this.navCfg().orbitPivot;
+    return m === 'center' || (m === 'auto' && src === 'trackpad') ? this.pivotAt(this.w / 2, this.h / 2) : this.pivotAt(x, y);
+  }
+  // true when a wheel event most likely comes from a trackpad two-finger swipe
+  isTrackpadWheel(e) {
+    const m = this.navCfg().wheelMode;
+    if (m === 'mouse') return false;
+    if (m === 'trackpad') return true;
+    return e.deltaMode === 0 && (Math.abs(e.deltaX) > 0.01 || !Number.isInteger(e.deltaY) || Math.abs(e.deltaY) < 40);
+  }
   bindInput() {
     const el = this.renderer.domElement, app = this.app;
     el.tabIndex = 0;
@@ -654,9 +681,10 @@ export class Viewport {
         const now = performance.now();
         if (e.button === 1 && this._lastMid && now - this._lastMid < 320) { const hit = this.pickFace(p.x, p.y); if (hit) { const d = hit.point.clone().sub(this.cam.target); this.animateTo({ eye: this.cam.eye.clone().add(d), target: hit.point }, 250); } this._lastMid = 0; return; }
         this._lastMid = now;
-        nav = { x: p.x, y: p.y, pivot: this.pivotAt(p.x, p.y), pan: e.shiftKey, moved: false };
+        const panFirst = this.navCfg().middleButton === 'pan';
+        nav = { x: p.x, y: p.y, pivot: this.navPivot(p.x, p.y), panFirst, moved: false };
         el.setPointerCapture(e.pointerId);
-        app.setCursor(e.shiftKey ? 'pan' : 'orbit', true);
+        app.setCursor(e.shiftKey !== panFirst ? 'pan' : 'orbit', true);
         return;
       }
       if (e.button === 2) { this._rdown = pos(e); return; }
@@ -670,13 +698,17 @@ export class Viewport {
       }
       if (nav) {
         const p = pos(e), dx = p.x - nav.x, dy = p.y - nav.y; nav.x = p.x; nav.y = p.y; nav.moved = true;
-        if (nav.pan || e.shiftKey) this.pan(dx, dy, nav.pivot); else this.orbit(dx, dy, nav.pivot);
+        if (e.shiftKey !== nav.panFirst) this.navPan(dx, dy, nav.pivot); else this.navOrbit(dx, dy, nav.pivot);
         return;
       }
       app.toolEvent('move', evOf(e));
     });
     const up = (e) => {
-      if (e.pointerType === 'touch') { touches.delete(e.pointerId); if (gest) { if (touches.size < 2) gest = null; return; } }
+      if (e.pointerType === 'touch') {
+        touches.delete(e.pointerId);
+        // a finger lifted: restart the gesture from the remaining fingers so the view does not jump
+        if (gest) { gest = touches.size >= 2 ? this.gestureState(touches) : null; if (!gest) this.pushHistory(); return; }
+      }
       if (nav) { nav = null; app.setCursor(null, true); this.pushHistory(); return; }
       if (e.button === 2) {
         const p = pos(e);
@@ -692,42 +724,69 @@ export class Viewport {
     el.addEventListener('pointerleave', () => { app.toolEvent('leave', {}); });
     el.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const p = pos(e);
-      const s = app.settings;
-      if (e.ctrlKey) { this.zoomAt(Math.exp(e.deltaY * 0.012), p.x, p.y); return; } // pinch
-      const isTrackpad = e.deltaMode === 0 && (Math.abs(e.deltaX) > 0.01 || !Number.isInteger(e.deltaY) || Math.abs(e.deltaY) < 40);
-      if (s.trackpad && isTrackpad) {
-        if (e.shiftKey) this.pan(-e.deltaX, -e.deltaY, this.pivotAt(p.x, p.y));
-        else { if (!this._tpPivot || performance.now() - this._tpT > 250) this._tpPivot = this.pivotAt(this.w / 2, this.h / 2); this._tpT = performance.now(); this.orbit(-e.deltaX * 0.9, -e.deltaY * 0.9, this._tpPivot); }
+      const p = pos(e), N = this.navCfg();
+      const px = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
+      const zx = N.zoomToCursor ? p.x : this.w / 2, zy = N.zoomToCursor ? p.y : this.h / 2;
+      // trackpad pinch arrives as ctrl+wheel with small deltas; Ctrl + mouse wheel has big notches
+      if (e.ctrlKey && e.deltaMode === 0 && Math.abs(e.deltaY) < 50) { this.zoomAt(Math.exp(e.deltaY * 0.012 * N.pinchSpeed), zx, zy); return; }
+      if (!e.ctrlKey && this.isTrackpadWheel(e)) {
+        const inv = N.tpInvert ? -1 : 1, dx = -e.deltaX * inv * px, dy = -e.deltaY * inv * px;
+        if ((N.tpSwipe === 'pan') !== e.shiftKey) this.navPan(dx, dy, this.pivotAt(p.x, p.y), 'trackpad');
+        else {
+          if (!this._tpPivot || performance.now() - this._tpT > 250) this._tpPivot = this.navPivot(p.x, p.y, 'trackpad');
+          this._tpT = performance.now();
+          this.navOrbit(dx * 0.9, dy * 0.9, this._tpPivot, 'trackpad');
+        }
         return;
       }
-      const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
-      const f = Math.exp(dy * 0.0016 * (s.invertZoom ? -1 : 1) * (s.zoomSpeed || 1));
-      this.zoomAt(f, p.x, p.y);
+      const d = (e.deltaY || (e.shiftKey ? e.deltaX : 0)) * px;
+      const f = Math.exp(Math.max(-400, Math.min(400, d)) * 0.0016 * (N.invertZoom ? -1 : 1) * (N.zoomSpeed || 1));
+      this.zoomAt(f, zx, zy);
     }, { passive: false });
-    // Safari trackpad gestures
-    let gs = 1;
-    el.addEventListener('gesturestart', (e) => { e.preventDefault(); gs = 1; });
-    el.addEventListener('gesturechange', (e) => { e.preventDefault(); const p = pos(e); this.zoomAt(gs / e.scale, p.x, p.y); gs = e.scale; });
+    // Safari trackpad gestures (pinch, and twist when enabled)
+    let gs = 1, gr = 0;
+    el.addEventListener('gesturestart', (e) => { e.preventDefault(); gs = 1; gr = 0; });
+    el.addEventListener('gesturechange', (e) => {
+      e.preventDefault(); const p = pos(e), N = this.navCfg();
+      if (e.scale > 0) this.zoomAt(Math.pow(gs / e.scale, N.pinchSpeed), p.x, p.y);
+      gs = e.scale;
+      if (N.touchTwist && e.rotation != null) { const da = e.rotation - gr; gr = e.rotation; if (Math.abs(da) < 30) this.navOrbit((-da * Math.PI) / 180 / 0.0065, 0, this.navPivot(p.x, p.y, 'trackpad'), 'trackpad'); }
+    });
     el.addEventListener('gestureend', (e) => e.preventDefault());
   }
   gestureState(touches) {
     const pts = [...touches.values()];
     const c = { x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length };
     const d = pts.length >= 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
-    return { c, d, n: pts.length, pivot: this.pivotAt(c.x, c.y) };
+    const a = pts.length >= 2 ? Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) : 0;
+    return { c, d, a, n: pts.length, pivot: this.navPivot(c.x, c.y, 'touch') };
   }
   applyGesture(g, touches) {
-    const s = this.gestureState(touches);
+    const s = this.gestureState(touches), N = this.navCfg();
     const dx = s.c.x - g.c.x, dy = s.c.y - g.c.y;
-    if (s.n >= 3) this.pan(dx, dy, g.pivot);
-    else {
-      if (g.d > 0 && s.d > 0 && Math.abs(s.d - g.d) > 1) this.zoomAt(g.d / s.d, s.c.x, s.c.y);
-      if (Math.abs(dx) + Math.abs(dy) > 0) this.orbit(dx, dy, g.pivot);
+    // two fingers do the chosen action (orbit by default), three fingers the other one
+    const panNow = (N.touchTwoFinger === 'pan') === (s.n < 3);
+    if (s.n < 3) {
+      if (g.d > 0 && s.d > 0 && Math.abs(s.d - g.d) > 1) this.zoomAt(Math.pow(g.d / s.d, N.touchPinchSpeed), s.c.x, s.c.y);
+      if (N.touchTwist && g.d > 40 && s.d > 40) {
+        let da = s.a - g.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+        if (Math.abs(da) > 0.002) this.orbit((-da / 0.0065) * (N.invertOrbitX ? -1 : 1), 0, g.pivot);
+      }
     }
-    g.c = s.c; g.d = s.d;
+    if (Math.abs(dx) + Math.abs(dy) > 0) { if (panNow) this.navPan(dx, dy, g.pivot, 'touch'); else this.navOrbit(dx, dy, g.pivot, 'touch'); }
+    g.c = s.c; g.d = s.d; g.a = s.a;
   }
 }
+
+// navigation defaults (Preferences › Navigation)
+export const NAV_DEFAULTS = {
+  // mouse
+  orbitSpeed: 1, panSpeed: 1, zoomSpeed: 1, invertZoom: false, invertOrbitX: false, invertOrbitY: false, zoomToCursor: true, middleButton: 'orbit', orbitPivot: 'auto',
+  // trackpad
+  wheelMode: 'auto', tpSwipe: 'orbit', tpOrbitSpeed: 1, tpPanSpeed: 1, pinchSpeed: 1, tpInvert: false,
+  // touch screen
+  touchTwoFinger: 'orbit', touchOrbitSpeed: 1, touchPanSpeed: 1, touchPinchSpeed: 1, touchTwist: false,
+};
 
 // ---------------------------------------------------------------- sun
 export function sunDirection(geo, sh) {

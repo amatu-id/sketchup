@@ -226,7 +226,19 @@ export class UI {
   setVCB(label, value) { if (!this.vcbInput) return; this.vcbLabel.textContent = label || 'Measurements'; if (!this.app.vcbText && document.activeElement !== this.vcbInput) this.vcbInput.value = value ?? ''; }
   setVCBText(t) { this.vcbInput.value = t; this.vcbInput.classList.toggle('typing', !!t); }
   flashVCB() { this.vcbInput.classList.add('bad'); setTimeout(() => this.vcbInput.classList.remove('bad'), 500); }
-  toast(text, ms = 2600) { this.toastEl.textContent = text; this.toastEl.classList.add('show'); clearTimeout(this._tt); this._tt = setTimeout(() => this.toastEl.classList.remove('show'), ms); }
+  // Image to 3D (AI) dialog — loaded on first use
+  image3d(file) { import('./image3d.js').then((m) => m.openImage3D(this.app, file)).catch((e) => { console.error(e); this.toast('Could not open Image to 3D: ' + e.message); }); }
+  // a picture was dropped/opened: flat picture or 3D model?
+  imageChoice(file) {
+    const url = URL.createObjectURL(file);
+    const body = h('div', { class: 'imgchoice' }, h('img', { src: url, alt: '' }), h('p', {}, 'Place “' + file.name + '” as a flat picture, or let AI turn the object in it into a 3D model?'));
+    this.modal('Picture', body, [
+      { label: 'Flat picture', run: () => { this.app.io.importImage(file); } },
+      { label: '3D model (AI)…', primary: true, run: () => { setTimeout(() => this.image3d(file), 0); } },
+    ]);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  toast(text, ms = 2600) { this.toastEl.textContent = text; this.toastEl.classList.add('show'); clearTimeout(this._tt); this._tt = setTimeout(() => this.toastEl.classList.remove('show'), Math.max(ms, Math.min(9000, text.length * 55))); }
 
   // ------------------------------------------------------------ scene tabs
   renderSceneTabs() {

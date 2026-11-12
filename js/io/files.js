@@ -46,12 +46,12 @@ export class IO {
   }
 
   // ------------------------------------------------------------ import
-  async importFile() { const f = await pickFile('.dae,.obj,.stl,.glb,.gltf,.dxf,.amsk,.png,.jpg,.jpeg'); if (f) await this.importBlob(f); }
+  async importFile() { const f = await pickFile('.dae,.obj,.stl,.glb,.gltf,.dxf,.amsk,.png,.jpg,.jpeg,.webp'); if (!f) return; if (/\.(png|jpe?g|webp)$/i.test(f.name)) this.app.ui.imageChoice(f); else await this.importBlob(f); }
   async importBlob(f) {
     const app = this.app, ext = f.name.split('.').pop().toLowerCase();
     try {
       if (ext === 'dxf') return this.importDXF(await f.text(), f.name);
-      if (['png', 'jpg', 'jpeg'].includes(ext)) return this.importImage(f);
+      if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return this.importImage(f);
       if (ext === 'amsk' || ext === 'json') return this.importModelAsComponent(JSON.parse(await f.text()), f.name);
       const url = URL.createObjectURL(f);
       let root, upY = true, scale = 1000;

@@ -184,6 +184,7 @@ export class Panels {
       app.setStatus('Click to place the component. Press Esc to cancel.');
     };
     const inModel = [...model.defs.values()].filter((d) => !d.group);
+    b.append(h('button', { class: 'comp ai', onclick: () => app.ui.image3d() }, h('span', { class: 'ci', html: icon('image3d') }), h('span', {}, h('b', {}, 'Image to 3D (AI)…'), h('small', {}, 'Upload a photo of an object (a chair, a lamp…) and get it as a 3D component'))));
     b.append(h('div', { class: 'sub' }, 'In Model'));
     const g1 = h('div', { class: 'complist' });
     if (!inModel.length) g1.append(h('div', { class: 'muted' }, 'No components yet.'));
