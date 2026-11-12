@@ -21,8 +21,9 @@ async function fetchModel(v) {
   for (const u of [MIRROR + v.mirror, HF + v.url]) {
     try {
       const res = await fetch(u); if (!res.ok) throw new Error('HTTP ' + res.status);
-      const total = +res.headers.get('content-length') || v.mb * 1e6, rd = res.body.getReader(), parts = []; let got = 0, last = 0;
-      for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (Date.now() - last > 150) { last = Date.now(); post({ type: 'progress', text: `Downloading the cut-out model… ${Math.round((got / total) * 100)}% of ${v.mb} MB (one time)` , p: got / total }); } }
+      // a compressed response reports its compressed length: fall back to the known model size
+      const total = (res.headers.get('content-encoding') ? 0 : +res.headers.get('content-length')) || v.mb * 1e6, rd = res.body.getReader(), parts = []; let got = 0, last = 0;
+      for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (Date.now() - last > 150) { last = Date.now(); post({ type: 'progress', text: `Downloading the cut-out model… ${Math.min(99, Math.round((got / total) * 100))}% of ${v.mb} MB (one time)`, p: Math.min(0.99, got / total) }); } }
       const buf = new Uint8Array(got); let o = 0; for (const p of parts) { buf.set(p, o); o += p.length; }
       if (cache) { try { await cache.put(key, new Response(buf, { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) { /* quota */ } }
       return buf;
@@ -30,14 +31,20 @@ async function fetchModel(v) {
   }
   throw new Error('Could not download the cut-out model (' + (err && err.message) + ')');
 }
+// GPU (WebGPU): fp16 model, ~0.5 s per picture. Without a GPU the quantized model runs on one CPU thread
+// (GitHub Pages is not cross-origin isolated), which takes about a minute on a laptop.
+async function pick(device) {
+  const gpu = device !== 'cpu' && await gpuOK();
+  return gpu ? { v: MODEL.gpu, gpu: true } : { v: MODEL.cpu, gpu: false };
+}
 async function load(device) {
   if (session) return;
-  useGPU = device !== 'cpu' && await gpuOK();
+  const p = await pick(device); useGPU = p.gpu;
   post({ type: 'progress', text: 'Loading the cut-out model…' });
   ort = await import(ORT + (useGPU ? 'ort.webgpu.bundle.min.mjs' : 'ort.wasm.bundle.min.mjs'));
   ort.env.wasm.wasmPaths = ORT; ort.env.logLevel = 'error';
   ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(8, navigator.hardwareConcurrency || 4) : 1;
-  const buf = await fetchModel(useGPU ? MODEL.gpu : MODEL.cpu);
+  const buf = await fetchModel(p.v);
   try { session = await ort.InferenceSession.create(buf, { executionProviders: useGPU ? ['webgpu', 'wasm'] : ['wasm'], graphOptimizationLevel: 'all' }); }
   catch (e) { if (!useGPU) throw e; session = null; ort = null; return load('cpu'); }
   const meta = session.inputMetadata && session.inputMetadata[0];
@@ -52,7 +59,7 @@ self.onmessage = async (ev) => {
   const { rgba, w, h, device } = ev.data;
   try {
     await load(device);
-    post({ type: 'progress', text: useGPU ? 'Cutting out the object (GPU)…' : 'Cutting out the object…' });
+    post({ type: 'progress', text: useGPU ? 'Cutting out the object (GPU)…' : 'Cutting out the object… (no GPU on this device, this can take a minute)' });
     const oc = new OffscreenCanvas(S, S), cx = oc.getContext('2d', { willReadFrequently: true });
     cx.drawImage(await createImageBitmap(new ImageData(new Uint8ClampedArray(rgba), w, h)), 0, 0, S, S);
     const px = cx.getImageData(0, 0, S, S).data, n = S * S, f = new Float32Array(3 * n);

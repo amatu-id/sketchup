@@ -55,7 +55,7 @@ export function openImage3D(app, file) {
   const colOut = h('output', {}, String(s.colors));
   colIn.addEventListener('input', () => { colOut.textContent = colIn.value; });
   const edgeSel = sel([['sharp', 'Sharp edges only (SketchUp look)'], ['all', 'All edges'], ['none', 'No edges (smooth)']], s.edges);
-  const bgSel = sel([['auto', 'Automatic cut-out'], ['ai', 'AI cut-out (busy backgrounds)'], ['plain', 'Plain background (fast)'], ['none', 'Use the whole picture']], s.bg);
+  const bgSel = sel([['auto', 'Automatic cut-out'], ['ai', 'AI cut-out on this device (busy backgrounds)'], ['plain', 'Plain background (fast)'], ['none', 'Use the whole picture']], s.bg);
   const tokIn = h('input', { type: 'password', value: app.settings.hfToken || '', placeholder: 'hf_… (optional)', autocomplete: 'off', spellcheck: 'false' });
   tokIn.addEventListener('change', () => { app.settings.hfToken = tokIn.value.trim(); app.saveSettings(); refreshQuota(); });
   const quotaLine = h('div', { class: 'muted i3d-quota' });
@@ -204,7 +204,7 @@ export function openImage3D(app, file) {
       }
       setProg(93); say('Turning it into SketchUp-style geometry…');
       await new Promise((r) => setTimeout(r, 30));
-      const out = await convert(app, glb, E, cut, s);
+      const out = await convert(app, glb, E, s.bg !== 'none' ? cut : null, s); // no mask without a cut-out
       setProg(98);
       const inst = place(app, out, { name: (nameIn.value || 'AI Model').trim(), size, dim: s.dim, edges: s.edges, engine: E, file: st.file?.name });
       setProg(100);
