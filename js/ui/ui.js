@@ -84,6 +84,7 @@ export class UI {
       this.iconBtn('undo', 'Undo', () => app.undo()), this.iconBtn('redo', 'Redo', () => app.redo()),
       this.iconBtn('save', 'Save', () => app.io.save()),
       h('button', { class: 'tb tray-toggle', title: 'Show / hide the Default Tray', html: icon('outliner'), onclick: () => { this.root.classList.toggle('tray-open'); requestAnimationFrame(() => app.view.resize()); } }),
+      h('button', { class: 'cta cta-render', onclick: () => this.render(), title: 'Render realistis: langit, taman, jalan, orang & kendaraan otomatis' }, h('span', { class: 'ic', html: icon('render') }), 'Render'),
       h('button', { class: 'cta', onclick: () => this.dialogDrawings(), title: 'Generate working drawings (PDF / DXF)' }, h('span', { class: 'ic', html: icon('drawings') }), 'Gambar Kerja'));
     this.menubar.append(this.titleEl, right);
   }
@@ -226,6 +227,9 @@ export class UI {
   setVCB(label, value) { if (!this.vcbInput) return; this.vcbLabel.textContent = label || 'Measurements'; if (!this.app.vcbText && document.activeElement !== this.vcbInput) this.vcbInput.value = value ?? ''; }
   setVCBText(t) { this.vcbInput.value = t; this.vcbInput.classList.toggle('typing', !!t); }
   flashVCB() { this.vcbInput.classList.add('bad'); setTimeout(() => this.vcbInput.classList.remove('bad'), 500); }
+  // Render window + Auto Paint — loaded on first use
+  render() { import('./render.js').then((m) => m.openRender(this.app)).catch((e) => { console.error(e); this.toast('Could not open Render: ' + e.message); }); }
+  autoPaint() { import('./render.js').then((m) => m.dialogAutoPaint(this.app)).catch((e) => { console.error(e); this.toast('Could not open Auto Paint: ' + e.message); }); }
   // Image to 3D (AI) dialog — loaded on first use
   image3d(file) { import('./image3d.js').then((m) => m.openImage3D(this.app, file)).catch((e) => { console.error(e); this.toast('Could not open Image to 3D: ' + e.message); }); }
   // a picture was dropped/opened: flat picture or 3D model?

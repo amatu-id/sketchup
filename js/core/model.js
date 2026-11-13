@@ -427,6 +427,7 @@ export function healEdge(ents, e) {
 
 // Remove vertices that only join two collinear edges with the same faces.
 export function removeCollinear(ents, vids) {
+  const gone = new Set();
   for (const v of vids) {
     if (!ents.verts.has(v)) continue;
     const es = [...(ents.vedges.get(v) || [])].map((x) => ents.edges.get(x));
@@ -447,7 +448,15 @@ export function removeCollinear(ents, vids) {
       for (const loop of f.loops) { const i = loop.indexOf(v); if (i >= 0) loop.splice(i, 1); }
       ne.faces.add(fid);
     }
-    ents.verts.delete(v); ents.vedges.delete(v);
+    ents.verts.delete(v); ents.vedges.delete(v); gone.add(v);
+  }
+  // a face that listed the vertex without being on its edges (thin strips of imported meshes): the vertex
+  // was collinear, so dropping it keeps the shape — then hook the face onto the merged edge
+  if (gone.size) for (const f of ents.faces.values()) {
+    if (!f.loops.some((l) => l.some((x) => gone.has(x)))) continue;
+    f.loops = f.loops.map((l) => l.filter((x) => !gone.has(x))).filter((l) => l.length >= 3);
+    if (!f.loops.length) { ents.faces.delete(f.id); continue; }
+    registerFace(ents, f);
   }
   ents.touch();
 }
@@ -712,6 +721,7 @@ export function modelToJSON(m) {
     materials: [...m.materials.values()], tags: [...m.tags.values()], scenes: m.scenes,
     defs: [...m.defs.values()].map((d) => ({ ...d, ents: entsToJSON(d.ents) })),
     activeSection: m.activeSection ?? null, axesM: m.axesM ? m.axesM.elements.slice() : null,
+    render: m.render || null,
     root: entsToJSON(m.root),
   };
 }
@@ -725,6 +735,7 @@ export function modelFromJSON(o) {
   for (const d of o.defs || []) { m.defs.set(d.id, { ...d, ents: entsFromJSON(d.ents) }); bumpNid(d.id); }
   m.root = entsFromJSON(o.root || {});
   m.activeSection = o.activeSection ?? null;
+  if (o.render) m.render = o.render;
   if (o.axesM) m.axesM = new THREE.Matrix4().fromArray(o.axesM);
   return m;
 }

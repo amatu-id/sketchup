@@ -597,7 +597,7 @@ export class Viewport {
       this.applyCamera();
       if (t >= 1) { this.anim = null; this.app.emit?.('camera-end'); }
     }
-    if (!this.dirty) return;
+    if (!this.dirty || this.suspended) return;
     this.dirty = false;
     this.render();
   }

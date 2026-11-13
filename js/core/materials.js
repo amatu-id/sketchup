@@ -128,6 +128,15 @@ export function textureCanvas(kind, color, size = 256) {
     case 'rust': noise(0.5, 12000, 2); break;
     case 'water': { for (let y = 0; y < S; y += 2) { g.fillStyle = shade(rgb, 0.9 + 0.15 * Math.sin(y * 0.2 + R())); g.fillRect(0, y, S, 2); } break; }
     case 'grass': for (let i = 0; i < 9000; i++) { g.strokeStyle = shade(rgb, 0.7 + R() * 0.6); g.beginPath(); const x = R() * S, y = R() * S; g.moveTo(x, y); g.lineTo(x + (R() - 0.5) * 3, y - 3 - R() * 4); g.stroke(); } break;
+    case 'fabric': {
+      // woven: fine warp/weft threads
+      const n = Math.max(32, S / 6);
+      for (let i = 0; i < n; i++) { const p = (i / n) * S; g.fillStyle = shade(rgb, i % 2 ? 0.9 : 1.08); g.fillRect(0, p, S, S / n * 0.55); g.fillStyle = shade(rgb, i % 2 ? 1.05 : 0.88); g.globalAlpha = 0.45; g.fillRect(p, 0, S / n * 0.55, S); g.globalAlpha = 1; }
+      noise(0.12, 5000, 1); break;
+    }
+    case 'leather': noise(0.18, 12000, 1.6); g.strokeStyle = shade(rgb, 0.8); g.globalAlpha = 0.25; for (let i = 0; i < 90; i++) { g.beginPath(); const x = R() * S, y = R() * S; g.moveTo(x, y); g.lineTo(x + (R() - 0.5) * 18, y + (R() - 0.5) * 18); g.stroke(); } g.globalAlpha = 1; break;
+    case 'bark': for (let x = 0; x < S; x += 2) { g.fillStyle = shade(rgb, 0.7 + R() * 0.55); g.fillRect(x, 0, 2, S); } g.strokeStyle = shade(rgb, 0.5); for (let i = 0; i < 60; i++) { const x = R() * S; g.beginPath(); g.moveTo(x, R() * S); g.lineTo(x + (R() - 0.5) * 6, R() * S); g.stroke(); } break;
+    case 'leaves': for (let i = 0; i < 900; i++) { g.fillStyle = shade(rgb, 0.65 + R() * 0.7); g.save(); g.translate(R() * S, R() * S); g.rotate(R() * 7); g.beginPath(); g.ellipse(0, 0, 7 + R() * 7, 3 + R() * 3, 0, 0, 7); g.fill(); g.restore(); } break;
     default: break;
   }
   return c;
