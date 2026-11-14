@@ -783,7 +783,8 @@ export const NAV_DEFAULTS = {
   // mouse
   orbitSpeed: 1, panSpeed: 1, zoomSpeed: 1, invertZoom: false, invertOrbitX: false, invertOrbitY: false, zoomToCursor: true, middleButton: 'orbit', orbitPivot: 'auto',
   // trackpad
-  wheelMode: 'auto', tpSwipe: 'orbit', tpOrbitSpeed: 1, tpPanSpeed: 1, pinchSpeed: 1, tpInvert: false,
+  // two-finger swipe (scroll) at 70 % by default — 100 % felt too fast on a MacBook trackpad
+  wheelMode: 'auto', tpSwipe: 'orbit', tpOrbitSpeed: 0.7, tpPanSpeed: 0.7, pinchSpeed: 1, tpInvert: false,
   // touch screen
   touchTwoFinger: 'orbit', touchOrbitSpeed: 1, touchPanSpeed: 1, touchPinchSpeed: 1, touchTwist: false,
 };

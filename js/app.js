@@ -23,6 +23,9 @@ export class App {
     this.root = root;
     this.listeners = {};
     this.settings = Object.assign({ trackpad: isMac, invertZoom: false, zoomSpeed: 1, tooltips: true, autosave: true, keys: {}, panels: null, toolbars: null, trayWidth: 300, theme: 'light' }, safeJSON(localStorage.getItem(SETTINGS_KEY)));
+    // 2026-11-14: trackpad two-finger swipe (orbit + pan) defaults to 70 % — drop swipe speeds saved before that once
+    if ((this.settings.navRev || 0) < 2) { delete this.settings.tpOrbitSpeed; delete this.settings.tpPanSpeed; this.settings.navRev = 2; this.saveSettings(); }
+    this.planeMode = 'auto'; // drawing plane of the shape tools (Plane bar, Draw › Drawing Plane, arrow keys)
     this.model = new Model();
     this.units = new Units(this.model);
     this.sel = new Set(); this.hover = new Set(); this.ctxPath = [];
@@ -490,6 +493,13 @@ export class App {
     this.setCursor(t.cursor);
     this.setStatus(t.status());
     this.emit('tool', id);
+    this.view.requestRender();
+  }
+  // drawing plane for Rectangle / Circle / Polygon / Arcs / Pie / Freehand: auto | h | v | x | y
+  setPlaneMode(m) {
+    this.planeMode = ['h', 'v', 'x', 'y'].includes(m) ? m : 'auto';
+    try { this.tool?.onPlaneMode?.(); } catch (e) { console.error(e); }
+    this.emit('plane', this.planeMode);
     this.view.requestRender();
   }
   toolEvent(type, ev) {

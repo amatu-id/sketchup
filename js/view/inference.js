@@ -110,7 +110,7 @@ export class Inference {
       let p, label = info.name ? `On ${info.name} Axis` : 'Parallel to Edge';
       const lines = [];
       if (bp) { p = start.clone().addScaledVector(dir, bp.p.clone().sub(start).dot(dir)); lines.push([bp.p, p, COL.gray, 1, [3, 3]]); label += ' / ' + ptRes().label; }
-      else if (be) { const r = segSeg(start.clone().addScaledVector(dir, -1e7), start.clone().addScaledVector(dir, 1e7), be.a, be.b); p = r.c1; }
+      else if (be) { const r = segSeg(start.clone().addScaledVector(dir, -1e7), start.clone().addScaledVector(dir, 1e7), be.a, be.b); if (r.parallel) { const q = lineRay(start, dir, ray.o, ray.d); p = q ? q.p : r.c1; } else p = r.c1; }
       else { const r = lineRay(start, dir, ray.o, ray.d); p = r ? r.p : start.clone(); }
       lines.push([start.clone().addScaledVector(dir, -1e5), start.clone().addScaledVector(dir, 1e5), info.color, 2, [7, 5]]);
       return res({ p, type: 'axis', label, color: info.color, dir, lines, locked: true });
@@ -165,6 +165,8 @@ export class Inference {
     if (be) {
       if (ac) {
         const r = segSeg(start.clone().addScaledVector(ac.d, -1e7), start.clone().addScaledVector(ac.d, 1e7), be.a, be.b);
+        // an edge lying along the axis line itself: stay under the cursor on that edge (segSeg of collinear lines is arbitrary)
+        if (r.dist < 1 && r.parallel) return res({ p: be.p, type: 'edge', label: ac.label + ' / On Edge', color: ac.info.color, dir: ac.d, lines: [[start, be.p, ac.info.color, 2, [7, 5]]], edge: be.ref, edgeA: be.a, edgeB: be.b });
         if (r.dist < 1) return res({ p: r.c1, type: 'intersect', label: ac.label + ' / On Edge', color: ac.info.color, dir: ac.d, lines: [[start, r.c1, ac.info.color, 2, [7, 5]]], edge: be.ref });
       }
       return res({ p: be.p, type: 'edge', label: 'On Edge' + this.scopeLabel(be.ref), color: COL.edge, edge: be.ref, edgeA: be.a, edgeB: be.b });

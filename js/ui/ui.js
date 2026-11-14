@@ -3,7 +3,7 @@ import { icon } from './icons.js';
 import { menus, TOOLBARS, DEFAULT_KEYS, keyLabel } from './commands.js';
 import { Panels } from './panels.js';
 import { Dialogs } from './dialogs.js';
-import { isMac } from '../tools/base.js';
+import { isMac, PLANE_TOOLS } from '../tools/base.js';
 import { splitSel } from '../core/ops.js';
 
 const h = (tag, attrs = {}, ...kids) => {
@@ -41,7 +41,7 @@ export class UI {
   }
   build() {
     const app = this.app;
-    this.buildMenus(); this.buildToolbars(); this.buildStatus(); this.panels.build(this.tray);
+    this.buildMenus(); this.buildToolbars(); this.buildStatus(); this.buildPlaneBar(); this.panels.build(this.tray);
     this.renderSceneTabs();
     // tray resize
     this.tray.style.width = (app.settings.trayWidth || 300) + 'px';
@@ -114,7 +114,7 @@ export class UI {
       if (!cmd) continue;
       const enabled = cmd.enabled ? cmd.enabled() : true;
       const checked = cmd.checked ? cmd.checked() : false;
-      const key = typeof it === 'string' ? keyLabel({ ...DEFAULT_KEYS, ...app.settings.keys }[it]) : '';
+      const key = (typeof it === 'string' ? keyLabel({ ...DEFAULT_KEYS, ...app.settings.keys }[it]) : '') || cmd.keyHint || '';
       const label = cmd.label2 ? cmd.label2() : cmd.label;
       const row = h('div', { class: 'menu-item' + (enabled ? '' : ' disabled') }, h('span', { class: 'mi-check' }, checked ? (cmd.radio ? '●' : '✓') : ''), h('span', { class: 'mi-label' }, label), h('span', { class: 'mi-key' }, key));
       row.addEventListener('pointerenter', () => { for (const s of list.querySelectorAll(':scope > .menu-item > .menu-list')) s.remove(); });
@@ -227,6 +227,36 @@ export class UI {
   setVCB(label, value) { if (!this.vcbInput) return; this.vcbLabel.textContent = label || 'Measurements'; if (!this.app.vcbText && document.activeElement !== this.vcbInput) this.vcbInput.value = value ?? ''; }
   setVCBText(t) { this.vcbInput.value = t; this.vcbInput.classList.toggle('typing', !!t); }
   flashVCB() { this.vcbInput.classList.add('bad'); setTimeout(() => this.vcbInput.classList.remove('bad'), 500); }
+  // ------------------------------------------------------------ drawing-plane bar (shape tools)
+  buildPlaneBar() {
+    const app = this.app;
+    const bar = h('div', { class: 'planebar off', role: 'toolbar', 'aria-label': 'Drawing plane' }, h('span', { class: 'pb-title' }, 'Plane'));
+    for (const [m, label, title, key] of PLANE_BTNS) {
+      const b = h('button', { class: 'pb-btn', 'data-m': m, title, 'aria-pressed': 'false' }, h('span', { class: 'pb-ic', html: PLANE_ICONS[m] }), h('span', { class: 'pb-lb' }, label), key ? h('kbd', {}, key) : null);
+      b.addEventListener('click', () => { app.setPlaneMode(m === app.planeMode ? 'auto' : m); app.view.renderer.domElement.focus({ preventScroll: true }); });
+      bar.append(b);
+    }
+    this.planeNowEl = h('span', { class: 'pb-now off', title: 'Plane the next shape is drawn on' });
+    bar.append(this.planeNowEl);
+    this.viewportEl.append(bar);
+    this.planeBar = bar;
+    app.on('tool', () => { this.setPlaneNow(null); this.refreshPlaneBar(); });
+    app.on('plane', () => this.refreshPlaneBar());
+    this.refreshPlaneBar();
+  }
+  refreshPlaneBar() {
+    const app = this.app, bar = this.planeBar; if (!bar) return;
+    bar.classList.toggle('off', !(PLANE_TOOLS.has(app.tool?.id) && app.settings.planeBar !== false));
+    for (const b of bar.querySelectorAll('.pb-btn')) { const on = b.dataset.m === (app.planeMode || 'auto'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
+  }
+  // live read-out of the plane under the cursor: info = { label, color } or null; state = auto | locked | held
+  setPlaneNow(info, state = 'auto') {
+    const el = this.planeNowEl; if (!el) return;
+    const k = info ? info.label + '|' + state : '';
+    if (el._k === k) return; el._k = k;
+    el.classList.toggle('off', !info); el.textContent = '';
+    if (info) el.append(h('i', { style: 'background:' + info.color }), info.label + (state === 'held' ? ' · Shift' : ''));
+  }
   // Render window + Auto Paint — loaded on first use
   render() { import('./render.js').then((m) => m.openRender(this.app)).catch((e) => { console.error(e); this.toast('Could not open Render: ' + e.message); }); }
   autoPaint() { import('./render.js').then((m) => m.dialogAutoPaint(this.app)).catch((e) => { console.error(e); this.toast('Could not open Auto Paint: ' + e.message); }); }
@@ -283,6 +313,22 @@ export class UI {
   modalOpen() { return !!this.modalEl; }
   closeModal() { if (this.modalEl) { this.modalEl.remove(); this.modalEl = null; this.app.view?.renderer.domElement.focus({ preventScroll: true }); } }
 }
+// Plane bar buttons: mode, label, tooltip, arrow key
+const PLANE_BTNS = [
+  ['auto', 'Auto', 'Auto — lies on the face under the cursor (also when snapped to its corners or edges); 2 Point / 3 Point Arcs swing to the plane you pull toward'],
+  ['h', 'Horizontal', 'Horizontal — flat, like the ground (↑)', '↑'],
+  ['v', 'Vertical', 'Vertical, facing you — stands upright toward the camera (↓)', '↓'],
+  ['x', 'Red', 'Vertical, facing the red axis (→)', '→'],
+  ['y', 'Green', 'Vertical, facing the green axis (←)', '←'],
+];
+const disc = (rx, ry, rot, stroke, fill, dash = '') => `<ellipse cx="9" cy="8" rx="${rx}" ry="${ry}" transform="rotate(${rot} 9 8)" fill="${fill}" stroke="${stroke}" stroke-width="1.4"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
+const PLANE_ICONS = {
+  auto: `<svg viewBox="0 0 18 16">${disc(7.4, 2.6, 0, '#6b717c', 'none')}${disc(2.6, 6.6, 0, '#6b717c', 'none', '2 1.6')}</svg>`,
+  h: `<svg viewBox="0 0 18 16">${disc(7.6, 3, 0, '#1f5fe0', 'rgba(31,95,224,.18)')}</svg>`,
+  v: `<svg viewBox="0 0 18 16">${disc(3.6, 6.8, 0, '#3b4048', 'rgba(59,64,72,.14)')}</svg>`,
+  x: `<svg viewBox="0 0 18 16">${disc(3.2, 6.8, -22, '#e0261b', 'rgba(224,38,27,.16)')}</svg>`,
+  y: `<svg viewBox="0 0 18 16">${disc(3.2, 6.8, 22, '#119b3a', 'rgba(17,155,58,.16)')}</svg>`,
+};
 function cloneDefSafe(app, id) {
   // imported lazily to avoid a cycle
   return app._cloneDef ? app._cloneDef(id) : id;

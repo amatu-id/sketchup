@@ -12,7 +12,7 @@ export class Tool {
   get view() { return this.app.view; }
   get model() { return this.app.model; }
   get inf() { return this.app.inf; }
-  onActivate() { this.reset(); }
+  onActivate() { this.holdN = null; this.reset(); }
   onDeactivate() { this.cancel(); }
   reset() { this.state = 0; this.app.view.overlay.marker = null; this.app.setVCB(this.vcbLabel || '', ''); }
   cancel() { if (this.live) this.app.cancelLive(); this.live = false; this.reset(); this.view.requestRender(); }
@@ -38,10 +38,80 @@ export class Tool {
 // Pick a drawing plane: face under cursor, locked axis or ground.
 export function planeFor(tool, r, lockAxisN) {
   if (lockAxisN) return lockAxisN.clone();
-  if (r && r.type === 'face' && r.normal) return r.normal.clone();
-  if (r && r.hit && (r.type === 'end' || r.type === 'mid' || r.type === 'edge') && r.hit.point.distanceTo(r.p) < 1) return r.hit.normal.clone();
-  return tool.inf.axes()[2].clone();
+  return faceNormalAt(r) || tool.inf.axes()[2].clone();
 }
+// Normal of the face the inferred point lies on: the face itself, or — when the point snapped to an
+// endpoint / midpoint / edge — the face under the cursor if that point lies in the face's plane.
+export function faceNormalAt(r) {
+  if (!r) return null;
+  if (r.type === 'face' && r.normal) return r.normal.clone();
+  const hit = r.hit;
+  if (hit && hit.normal && onPlaneOf(hit, r.p)) return hit.normal.clone();
+  return null;
+}
+export const onPlaneOf = (hit, p) => Math.abs(hit.normal.dot(p.clone().sub(hit.point))) < Math.max(0.5, hit.dist * 2e-4);
+
+// ---------------------------------------------------------------- drawing plane
+// Shared by the planar shape tools; chosen on the Plane bar above the viewport, in Draw › Drawing Plane
+// or with the arrow keys. app.planeMode: 'auto' | 'h' horizontal (⟂ blue) | 'v' vertical facing the
+// camera | 'x' vertical ⟂ red | 'y' vertical ⟂ green. Holding Shift keeps the plane shown under the cursor.
+export const PLANE_TOOLS = new Set(['rect', 'circle', 'polygon', 'arc', 'arc2', 'arc3', 'pie', 'freehand']);
+export const PLANE_KEYS = { ArrowUp: 'h', ArrowRight: 'x', ArrowLeft: 'y', ArrowDown: 'v' };
+export function planeKey(tool, e) {
+  const m = PLANE_KEYS[e.key]; if (!m) return false;
+  tool.app.setPlaneMode(tool.app.planeMode === m ? 'auto' : m);
+  return true;
+}
+// normal of the locked plane, or null in Auto
+export function lockedNormal(tool, mode = tool.app.planeMode) {
+  const ax = tool.inf.axes();
+  if (mode === 'h') return ax[2].clone();
+  if (mode === 'x') return ax[0].clone();
+  if (mode === 'y') return ax[1].clone();
+  if (mode === 'v') return facingVertical(tool);
+  return null;
+}
+// the upright axis plane that faces the camera most (normal red or green)
+export function facingVertical(tool) {
+  const ax = tool.inf.axes(), v = tool.view;
+  let d = v.viewDir(); d.addScaledVector(ax[2], -d.dot(ax[2]));
+  if (d.lengthSq() < 0.02) { d = new THREE.Vector3().setFromMatrixColumn(v.camera.matrixWorld, 1); d.addScaledVector(ax[2], -d.dot(ax[2])); }
+  return Math.abs(d.dot(ax[0])) >= Math.abs(d.dot(ax[1])) ? ax[0].clone() : ax[1].clone();
+}
+// plane of a shape tool at an inferred point: Shift-held, locked, face under the cursor, else horizontal
+export function shapePlane(tool, r) { return tool.holdN ? tool.holdN.clone() : lockedNormal(tool) || planeFor(tool, r, null); }
+// readable name + colour of a plane normal
+export function planeInfo(tool, n) {
+  const ax = tool.inf.axes(), a = ax.map((x) => Math.abs(x.dot(n)));
+  if (a[2] > 0.9999) return { label: 'Horizontal', color: COL.blue };
+  if (a[0] > 0.9999) return { label: 'Vertical (Red)', color: COL.red };
+  if (a[1] > 0.9999) return { label: 'Vertical (Green)', color: COL.green };
+  if (a[2] < 1e-3) return { label: 'Vertical', color: COL.magenta };
+  return { label: 'Sloped', color: COL.magenta };
+}
+// show the current plane in the Plane bar read-out (null hides it)
+export function notePlane(tool, n) {
+  tool.app.ui?.setPlaneNow?.(n ? planeInfo(tool, n) : null, tool.holdN ? 'held' : tool.app.planeMode !== 'auto' ? 'locked' : 'auto');
+}
+// marker for a hovered point that also names the drawing plane (tooltip + Plane bar read-out)
+export function planeMarker(tool, r, n, extra = '') {
+  notePlane(tool, n);
+  return { ...r, label: [r.label, extra, planeInfo(tool, n).label].filter(Boolean).join(' · ') };
+}
+// keys shared by the shape tools: arrows pick the plane, Shift (while hovering) keeps the plane under the cursor
+export function shapeKey(tool, e, canHold) {
+  if (planeKey(tool, e)) return true;
+  if (e.key === 'Shift' && canHold && tool.hovN && !tool.holdN) { tool.holdN = tool.hovN.clone(); return true; }
+  return false;
+}
+export function shapeKeyUp(tool, e) { if (e.key === 'Shift' && tool.holdN) { tool.holdN = null; return true; } return false; }
+// small square lying in the drawing plane at the cursor (Rectangle / Freehand hover)
+export function drawPlaneSquare(tool, ov, p, n, color) {
+  const v = ov.view, s = (v.cam.ortho ? v.cam.orthoH : p.distanceTo(v.camera.position)) * 0.04;
+  const { u, v: w } = planeBasisAxes(tool, n);
+  ov.poly([p, p.clone().addScaledVector(u, s), p.clone().addScaledVector(u, s).addScaledVector(w, s), p.clone().addScaledVector(w, s)], color, tint(color, 0.14), 1.4);
+}
+export const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 export function planeBasisAxes(tool, n) {
   const ax = tool.inf.axes();
   let u = null;

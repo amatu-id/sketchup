@@ -156,7 +156,7 @@ export class Dialogs {
       const r = h('input', { type: 'range', min, max, step: 0.05, value: N[k], 'aria-label': label });
       r.addEventListener('input', () => { set(k, +r.value); out.textContent = pct(+r.value); });
       r.addEventListener('dblclick', () => { r.value = NAV_DEFAULTS[k]; set(k, NAV_DEFAULTS[k]); out.textContent = pct(NAV_DEFAULTS[k]); });
-      return h('label', { class: 'fld sl', title: 'Double-click the slider to reset to 100%' }, h('span', {}, label), r, out);
+      return h('label', { class: 'fld sl', title: 'Double-click the slider to reset to the default (' + pct(NAV_DEFAULTS[k]) + ')' }, h('span', {}, label), r, out);
     };
     const choice = (k, label, opts) => { const x = sel(opts, N[k]); x.addEventListener('change', () => set(k, x.value)); return field(label, x); };
     const check = (k, label) => { const [row, i] = cb(N[k], label); i.addEventListener('change', () => set(k, i.checked)); return row; };
@@ -263,7 +263,7 @@ export class Dialogs {
       h('p', { class: 'muted' }, 'Image to 3D uses free models hosted on Hugging Face Spaces (Hunyuan3D 2.1 by Tencent, TRELLIS by Microsoft, Stable Fast 3D by Stability AI, TripoSG by VAST). Your picture goes straight from this browser to the Space you pick, under that model’s own license and terms.')), [{ label: 'Close', primary: true }]);
   }
   dialogGestures() {
-    const rows = [['Orbit', 'Middle-drag · O tool · trackpad two-finger swipe · touch two-finger drag'], ['Pan', 'Shift + middle-drag · H tool · Shift + two-finger swipe · touch three-finger drag'], ['Zoom', 'Scroll wheel (zooms to cursor) · pinch · Z tool'], ['Center view', 'Double-click with the middle button / in the Orbit tool'], ['Zoom Extents', 'Shift+Z'], ['Context menu', 'Right-click · two-finger tap'], ['Lock inference', 'Hold Shift'], ['Lock axis', '→ red · ← green · ↑ blue · ↓ parallel/perpendicular'], ['Copy (Move/Rotate)', isMac ? 'Tap ⌥ Option' : 'Tap Ctrl'], ['Arrays', 'After copying type x5 or /5 and Enter'], ['Measurements', 'Just type numbers while using a tool, then Enter']];
+    const rows = [['Orbit', 'Middle-drag · O tool · trackpad two-finger swipe · touch two-finger drag'], ['Pan', 'Shift + middle-drag · H tool · Shift + two-finger swipe · touch three-finger drag'], ['Zoom', 'Scroll wheel (zooms to cursor) · pinch · Z tool'], ['Center view', 'Double-click with the middle button / in the Orbit tool'], ['Zoom Extents', 'Shift+Z'], ['Context menu', 'Right-click · two-finger tap'], ['Lock inference', 'Hold Shift'], ['Lock axis', '→ red · ← green · ↑ blue · ↓ parallel/perpendicular'], ['Drawing plane', 'Circle, Arc, Rectangle, Polygon, Pie: ↑ horizontal · ↓ vertical facing you · → red · ← green (same key again = Auto) · hold Shift to keep the plane · or the Plane bar above the view'], ['Copy (Move/Rotate)', isMac ? 'Tap ⌥ Option' : 'Tap Ctrl'], ['Arrays', 'After copying type x5 or /5 and Enter'], ['Measurements', 'Just type numbers while using a tool, then Enter']];
     this.ui.modal('Mouse, Trackpad & Gestures', h('table', { class: 'stats' }, ...rows.map(([a, b]) => h('tr', {}, h('td', {}, h('b', {}, a)), h('td', {}, b)))), [{ label: 'Sensitivity settings…', run: () => { this.dialogPrefs('nav'); return false; } }, { label: 'Close', primary: true }], { wide: true });
   }
 }

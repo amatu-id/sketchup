@@ -346,3 +346,26 @@ textarea { resize: vertical; }
 .ap-row select { width: 100%; }
 .rd-topbtns .btn { white-space: nowrap; }
 @media (max-width: 420px) { .rd-title b, .rd-kind { display: none; } .rd-topbtns { gap: 4px; } .rd-topbtns .btn { padding: 5px 7px; font-size: 12px; } }
+/* drawing-plane bar (Rectangle, Circle, Polygon, Arcs, Pie, Freehand) */
+.planebar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 1px; padding: 3px; max-width: calc(100% - 16px);
+  background: rgba(255, 255, 255, .95); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 14px rgba(20, 30, 50, .12); user-select: none; -webkit-user-select: none; }
+.planebar.off { display: none; }
+.pb-title { font-size: 10.5px; font-weight: 600; color: var(--muted); padding: 0 6px 0 6px; text-transform: uppercase; letter-spacing: .05em; }
+.pb-btn { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; border-radius: 7px; padding: 4px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; color: var(--text); }
+.pb-btn:hover { background: var(--hover); }
+.pb-btn.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px #8fb3f7; font-weight: 600; }
+.pb-btn kbd { font: 10.5px/1.2 var(--font); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; background: #fff; }
+.pb-ic { display: inline-grid; width: 18px; height: 16px; } .pb-ic svg { width: 18px; height: 16px; display: block; }
+.pb-now { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); padding: 0 8px 0 9px; margin-left: 3px; border-left: 1px solid var(--line2); white-space: nowrap; }
+.pb-now.off { display: none; }
+.pb-now i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+@media (max-width: 760px) {
+  .pb-lb, .pb-btn kbd, .pb-title { display: none; }
+  .pb-btn { padding: 6px 8px; }
+  .pb-now { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .pb-now i { display: inline-block; margin-right: 4px; vertical-align: -1px; }
+}
+/* the bar follows the viewport width (tray open, small windows), not just the window */
+.viewport { container-type: inline-size; }
+@container (max-width: 760px) { .pb-btn kbd, .pb-title { display: none; } }
+@container (max-width: 600px) { .pb-lb { display: none; } .pb-btn { padding: 6px 8px; } }
